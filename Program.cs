@@ -1,6 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
-using Bogus; 
+using Bogus;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,21 +12,51 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// // 1. Agregar DbContext en memoria
-// builder.Services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase("ProductosDb"));
+var issuer = builder.Configuration["JwtSettings:Issuer"];
+var audience = builder.Configuration["JwtSettings:Audience"];
+var secretKey = builder.Configuration["JwtSettings:SecretKey"]; //se obtiene del secret del project
+
+if (string.IsNullOrEmpty(secretKey))
+{
+    throw new InvalidOperationException("La clave secreta 'JwtSettings:SecretKey' no está configurada en tus User Secrets.");
+}
+
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("JwtSettings"));
+
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = issuer,
+        ValidAudience = audience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+    };
+
+    // EVENTO CLAVE: Extraer el token de la cookie "X-Access-Token"
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            context.Token = context.Request.Cookies["X-Access-Token"];
+            return Task.CompletedTask;
+        }
+    };
+});
+
+
 builder.Services.AddDbContext<AppDbContext>(opt => opt.UseSqlite("Data Source=productos.db"));
 
-// 2. Configurar CORS para React (Vite)
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowReactApp", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173")// URL por defecto de Vite
-              .WithOrigins("http://localhost:5174")// URL por defecto de React
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
-});
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
@@ -37,16 +71,26 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference(); 
 }
 
-// 3. Activar la política de CORS
-app.UseCors("AllowReactApp");
+// Activar la política de CORS
+app.UseCors(policy => policy
+    .WithOrigins("https://localhost:5173", "http://localhost:5173")
+    .AllowAnyHeader().AllowAnyMethod().AllowCredentials()); 
 
+app.UseAuthentication(); // Debe ir antes de Authorization
 app.UseAuthorization();
+
 app.MapControllers();
 
 
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    // Configure the HTTP request pipeline.
+    if (app.Environment.IsDevelopment())
+    {
+        context.Database.Migrate(); // <- Esto hace el "database update" automáticamente
+    }
 
     if (!context.Productos.Any())
     {        
@@ -63,8 +107,6 @@ using (var scope = app.Services.CreateScope())
         await context.SaveChangesAsync();
     }
 }
-
-
 
 app.Run();
 
