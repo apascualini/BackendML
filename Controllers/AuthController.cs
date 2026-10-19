@@ -69,7 +69,7 @@ public class AuthController : ControllerBase
     }
 
     // GET: api/auth/status
-    [Authorize] // Bloquea automáticamente si el JWT de la cookie es inválido o expiró
+    [Authorize(Roles = "Usuario,Admin")] // Bloquea automáticamente si el JWT de la cookie es inválido o expiró
     [HttpGet("status")]
     public IActionResult GetAuthStatus()
     {

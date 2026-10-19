@@ -19,6 +19,8 @@ public class Usuario
     
     // Aquí guardaremos la contraseña ya encriptada
     public string PasswordHash { get; set; } = string.Empty;
+
+    public string Rol { get; set; } = "Usuario"; // Rol por defecto
     
     public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
 }

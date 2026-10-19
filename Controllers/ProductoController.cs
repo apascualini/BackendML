@@ -14,7 +14,7 @@ public class ProductoController : ControllerBase
         _context = context;
     }
 
-    [Authorize]
+    [Authorize(Roles = "Usuario,Admin")]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Producto>>> GetProductos(
         [FromQuery] string? buscar = null,
@@ -65,7 +65,7 @@ public class ProductoController : ControllerBase
         });
     }
 
-    [Authorize]
+    [Authorize(Roles = "Usuario,Admin")]
     [HttpGet("{id}")]
     public async Task<ActionResult<Producto>> GetProducto(int id)
     {
@@ -77,7 +77,7 @@ public class ProductoController : ControllerBase
         return producto;
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<ActionResult<Producto>> CreateProducto(Producto producto)
     {
@@ -86,7 +86,7 @@ public class ProductoController : ControllerBase
         return CreatedAtAction(nameof(GetProducto), new { id = producto.Id }, producto);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateProducto(int id, Producto producto)
     {
@@ -101,7 +101,7 @@ public class ProductoController : ControllerBase
         return NoContent();
     }
     
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteProducto(int id)
     {
